@@ -20,6 +20,8 @@ class DummyWHIRPreset:
         folding_factor = 4
         field = GOLDILOCKS_2
         log_degree = 23
+        batch_size = 100
+        power_batching = True
         constraint_degree = 1
         num_queries = [80,35,22,12,9]
         num_ood_samples = [2,2,2,2]
@@ -33,6 +35,8 @@ class DummyWHIRPreset:
             folding_factor=folding_factor,
             field=field,
             log_degree=log_degree,
+            batch_size=batch_size,
+            power_batching=power_batching,
             constraint_degree=constraint_degree,
             num_queries=num_queries,
             num_ood_samples=num_ood_samples

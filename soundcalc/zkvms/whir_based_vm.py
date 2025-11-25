@@ -47,10 +47,14 @@ class WHIRBasedVMConfig:
     # in the WHIR paper, this is denoted by m
     log_degree: int
 
-    # how many functions do we test in one go
-    # TODO (BW): need to check how batching is done in WHIR
-    # https://github.com/WizardOfMenlo/stir-whir-scripts/blob/main/src/whir.rs#L144
-    # batch_size: int
+    # how many functions do we check in one go, i.e., this is the batch size
+    # for reference: https://github.com/WizardOfMenlo/stir-whir-scripts/blob/main/src/whir.rs#L144
+    batch_size: int
+
+    # Boolean flag to indicate if batching is implemented using coefficients
+    # r^0, r^1, ... r^{num_polys-1} (power_batching = True) or
+    # 1, r_1, r_2, ... r_{num_polys - 1} (power_batching = False)
+    power_batching: bool
 
     # degree of constraints being proven on the committed words
     # This is d in Construction 5.1 in WHIR. Note that d = max{d*,3},
@@ -85,6 +89,8 @@ class WHIRBasedVM(zkVM):
         self.constraint_degree = config.constraint_degree
         self.num_queries = config.num_queries
         self.num_ood_samples = config.num_ood_samples
+        self.batch_size = config.batch_size
+        self.power_batching = config.power_batching
 
         # determine all rates (in contrast to FRI, these change over the iterations)
         # this also involves determining all log degrees
@@ -117,6 +123,7 @@ class WHIRBasedVM(zkVM):
             "name": self.name,
             "hash_size_bits": self.hash_size_bits,
             "folding_factor": self.folding_factor,
+            "batch_size": self.batch_size,
             "num_iterations": self.num_iterations,
             "constraint_degree": self.constraint_degree,
             "field": self.field.to_string(),
@@ -207,7 +214,10 @@ class WHIRBasedVM(zkVM):
         """
         levels = {}
 
-        # TODO: add an error from the batching step
+        # add an error from the batching step
+        if self.batch_size > 1:
+            epsilon_batch = self.epsilon_batch(regime)
+            levels[f"batching"] = get_bits_of_security_from_error(epsilon_batch)
 
         # initial iteration (just sum check / fold errors)
         iteration = 0
@@ -303,6 +313,21 @@ class WHIRBasedVM(zkVM):
         list_size = regime.get_max_list_size(rate, dimension, self.field, delta)
 
         return list_size
+
+    def epsilon_batch(self, regime: ProximityGapsRegime) -> float:
+        """
+        Returns the error due to the batching step. This depends on whether batching is done
+        with powers or with random coefficients.
+
+        This follows https://github.com/WizardOfMenlo/stir-whir-scripts/blob/main/src/whir.rs#L144
+        """
+
+        rate = 2 ** (-self.log_inv_rates[0])
+        dimension = 2 ** self.log_degrees[0]
+
+        if self.power_batching:
+            return regime.get_error_powers(rate, dimension, self.field, self.batch_size)
+        return regime.get_error_linear(rate, dimension, self.field, self.batch_size)
 
     def epsilon_fold(self, iteration: int, round: int, regime: ProximityGapsRegime) -> float:
         """
