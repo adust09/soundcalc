@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from .zkevm import zkEVMConfig, zkEVMParams
+from soundcalc.zkvms.fri_based_vm import FRIBasedVM, FRIBasedVMConfig
+
 from ..common.fields import *
 
 
@@ -31,7 +32,7 @@ class ZiskPreset:
 
         trace_length = 1 << 22
         num_columns = 66
-        num_polys = num_columns + 2 # +2 for the composition polynomials
+        batch_size = num_columns + 2 # +2 for the composition polynomials
 
         num_queries = 128 // int(math.log2(blowup_factor))
 
@@ -44,14 +45,14 @@ class ZiskPreset:
 
         hash_size_bits = 256 # TODO: check if that is actually true
 
-        cfg = zkEVMConfig(
+        cfg = FRIBasedVMConfig(
             name="ZisK",
             hash_size_bits=hash_size_bits,
             rho=rho,
             trace_length=trace_length,
             field=field,
             num_columns=num_columns,
-            num_polys=num_polys,
+            batch_size=batch_size,
             power_batching=True,
             num_queries=num_queries,
             AIR_max_degree=AIR_max_degree,
@@ -60,4 +61,4 @@ class ZiskPreset:
             max_combo=max_combo,
             grinding_query_phase=0,
         )
-        return zkEVMParams(cfg)
+        return FRIBasedVM(cfg)

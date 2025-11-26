@@ -18,6 +18,12 @@ class FieldParams:
     # Extension field size |F| = p^{ext_size}
     F: float
 
+    def to_string(self) -> str:
+        """
+        Returns a human-readable string representing the field,
+        """
+        return self.name
+
 
 def _F(p: int, ext_size: int) -> float:
     # Keep as float to match existing zkEVMConfig expectations
@@ -31,28 +37,28 @@ BABYBEAR_P = (1 << 31) - (1 << 27) + 1
 
 # Preset extension fields
 GOLDILOCKS_2 = FieldParams(
-    name="Goldilocks^2",
+    name="Goldilocks²",
     p=GOLDILOCKS_P,
     field_extension_degree=2,
     F=_F(GOLDILOCKS_P, 2),
 )
 
 GOLDILOCKS_3 = FieldParams(
-    name="Goldilocks^3",
+    name="Goldilocks³",
     p=GOLDILOCKS_P,
     field_extension_degree=3,
     F=_F(GOLDILOCKS_P, 3),
 )
 
 BABYBEAR_4 = FieldParams(
-    name="BabyBear^4",
+    name="BabyBear⁴",
     p=BABYBEAR_P,
     field_extension_degree=4,
     F=_F(BABYBEAR_P, 4),
 )
 
 BABYBEAR_5 = FieldParams(
-    name="BabyBear^5",
+    name="BabyBear⁵",
     p=BABYBEAR_P,
     field_extension_degree=5,
     F=_F(BABYBEAR_P, 5),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from .zkevm import zkEVMConfig, zkEVMParams
+from soundcalc.zkvms.fri_based_vm import FRIBasedVM, FRIBasedVMConfig
+
 from ..common.fields import *
 
 
@@ -44,14 +45,14 @@ class Risc0Preset:
 
         hash_size_bits = 256 # TODO: check if that is actually true
 
-        cfg = zkEVMConfig(
+        cfg = FRIBasedVMConfig(
             name="RISC0",
             hash_size_bits=hash_size_bits,
             rho=rho,
             trace_length=trace_length,
             field=field,
             num_columns=C,
-            num_polys=L,
+            batch_size=L,
             power_batching=power_batching,
             num_queries=s,
             max_combo=max_combo,
@@ -60,4 +61,4 @@ class Risc0Preset:
             grinding_query_phase=0,
             AIR_max_degree=AIR_max_degree,
         )
-        return zkEVMParams(cfg)
+        return FRIBasedVM(cfg)
