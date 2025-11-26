@@ -29,11 +29,11 @@ How to read this report:
 
 **Proof Size Estimate:** 992 KiB, where 1 KiB = 1024 bytes
 
-| regime | total | ALI | DEEP | FRI batching round | FRI commit rounds (×5) | FRI query phase |
-| --- | --- | --- | --- | --- | --- | --- |
-| UDR | 53 | 185 | 167 | 162 | 165 | 53 |
-| JBR | 58 | 181 | 163 | 142 | 159 | 58 |
-| best attack | 128 | — | — | — | — | — |
+| regime | total | ALI | DEEP |
+| --- | --- | --- | --- |
+| UDR | 167 | 185 | 167 |
+| JBR | 162 | 180 | 162 |
+| best attack | 128 | — | — |
 
 ## Miden
 
@@ -51,11 +51,11 @@ How to read this report:
 
 **Proof Size Estimate:** 175 KiB, where 1 KiB = 1024 bytes
 
-| regime | total | ALI | DEEP | FRI batching round | FRI commit rounds (×7) | FRI query phase |
-| --- | --- | --- | --- | --- | --- | --- |
-| UDR | 38 | 121 | 106 | 100 | 105 | 38 |
-| JBR | 55 | 115 | 101 | 77 | 98 | 55 |
-| best attack | 96 | — | — | — | — | — |
+| regime | total | ALI | DEEP |
+| --- | --- | --- | --- |
+| UDR | 106 | 121 | 106 |
+| JBR | 99 | 114 | 99 |
+| best attack | 96 | — | — |
 
 ## RISC0
 
@@ -73,11 +73,11 @@ How to read this report:
 
 **Proof Size Estimate:** 576 KiB, where 1 KiB = 1024 bytes
 
-| regime | total | ALI | DEEP | FRI batching round | FRI commit rounds (×4) | FRI query phase |
-| --- | --- | --- | --- | --- | --- | --- |
-| UDR | 33 | 115 | 100 | 92 | 96 | 33 |
-| JBR | 47 | 110 | 95 | 70 | 90 | 47 |
-| best attack | 99 | — | — | — | — | — |
+| regime | total | ALI | DEEP |
+| --- | --- | --- | --- |
+| UDR | 100 | 115 | 100 |
+| JBR | 94 | 109 | 94 |
+| best attack | 99 | — | — |
 
 ## DummyWHIR
 

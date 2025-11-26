@@ -6,10 +6,11 @@ from typing import Protocol, Mapping, Any
 from math import log2
 
 from soundcalc.common.utils import get_bits_of_security_from_error
-from soundcalc.regimes.best_attack import best_attack_security
+from soundcalc.proxgaps.johnson_bound import JohnsonBoundRegime
+from soundcalc.proxgaps.proxgaps_regime import ProximityGapsRegime
+from soundcalc.proxgaps.unique_decoding import UniqueDecodingRegime
+from soundcalc.zkvms.best_attack import best_attack_security
 from soundcalc.regimes.fri_regime import FRIParameters
-from soundcalc.regimes.johnson_bound import JohnsonBoundRegime
-from soundcalc.regimes.unique_decoding import UniqueDecodingRegime
 from soundcalc.zkvms.zkvm import zkVM
 from ..common.fields import FieldParams, field_element_size_bits
 from ..common.fri import get_FRI_proof_size_bits, get_num_FRI_folding_rounds
@@ -226,10 +227,20 @@ class FRIBasedVM(zkVM):
         """
 
         # we consider the following regimes, and for each regime do the analysis
-        regimes = [
-            UniqueDecodingRegime(),
-            JohnsonBoundRegime(),
-        ]
+        regimes = [UniqueDecodingRegime(), JohnsonBoundRegime()]
+
+        result = {}
+        for regime in regimes:
+            id = regime.identifier()
+            fri_levels = self.get_security_levels_for_regime(regime)
+            rate = self.rho
+            dimension = self.trace_length
+            delta = regime.get_max_delta(rate, dimension, self.field)
+            list_size = regime.get_max_list_size(rate, dimension, self.field, delta)
+            proof_system_levels = get_DEEP_ALI_errors(list_size, self)
+            total = min(list(fri_levels.values()) + list(proof_system_levels.values()))
+            result[id] = fri_levels | proof_system_levels | {"total": total}
+
 
         fri_parameters = FRIParameters(
             hash_size_bits=self.hash_size_bits,
@@ -249,19 +260,28 @@ class FRIBasedVM(zkVM):
             trace_length=self.trace_length,
             max_combo=self.max_combo
         )
-
-        result = {}
-        for regime in regimes:
-            id = regime.identifier()
-
-            # errors consist of FRI errors and proof system errors
-            fri_levels = regime.get_rbr_levels(fri_parameters)
-            list_size = regime.get_bound_on_list_size(fri_parameters)
-            proof_system_levels = get_DEEP_ALI_errors(list_size, self)
-            total = min(list(fri_levels.values()) + list(proof_system_levels.values()))
-
-            result[id] = fri_levels | proof_system_levels | {"total": total}
-
         result["best attack"] = best_attack_security(fri_parameters)
 
         return result
+
+
+
+        #result = {}
+        #for regime in regimes:
+        #    id = regime.identifier()
+
+        #    # errors consist of FRI errors and proof system errors
+        #    fri_levels = regime.get_rbr_levels(fri_parameters)
+        #    list_size = regime.get_bound_on_list_size(fri_parameters)
+        #
+
+
+
+        # return result
+
+    def get_security_levels_for_regime(self, regime: ProximityGapsRegime) -> dict[str, int]:
+        """
+        Same as get_security_levels, but for a specific regime.
+        """
+        # TODO implement
+        return {}
