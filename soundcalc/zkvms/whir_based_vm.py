@@ -252,7 +252,7 @@ class WHIRBasedVM(zkVM):
 
         # add an error from the batching step
         if self.batch_size > 1:
-            epsilon_batch = self.epsilon_batch(regime)
+            epsilon_batch = self.get_batching_error(regime)
             levels[f"batching"] = get_bits_of_security_from_error(epsilon_batch)
 
         # initial iteration (just sum check / fold errors)
@@ -275,14 +275,13 @@ class WHIRBasedVM(zkVM):
                 levels[f"fold(i={iteration},s={round})"] = get_bits_of_security_from_error(epsilon)
 
         # final error
-        epsilon_fin = self.epsilon_fin(regime)
-        levels["fin"] = get_bits_of_security_from_error(epsilon_fin)
+        epsilon_final = self.epsilon_final(regime)
+        levels["fin"] = get_bits_of_security_from_error(epsilon_final)
 
         # add a "total" level
         levels["total"] = min(list(levels.values()))
 
         return levels
-
 
     def get_code_for_iteration_and_round(self, iteration: int, round: int) -> tuple[float, int]:
         """
@@ -350,7 +349,7 @@ class WHIRBasedVM(zkVM):
 
         return list_size
 
-    def epsilon_batch(self, regime: ProximityGapsRegime) -> float:
+    def get_batching_error(self, regime: ProximityGapsRegime) -> float:
         """
         Returns the error due to the batching step. This depends on whether batching is done
         with powers or with random coefficients.
@@ -361,9 +360,10 @@ class WHIRBasedVM(zkVM):
         rate = 2 ** (-self.log_inv_rates[0])
         dimension = 2 ** self.log_degrees[0]
 
-        epsilon = regime.get_error_linear(rate, dimension, self.field)
         if self.power_batching:
             epsilon = regime.get_error_powers(rate, dimension, self.field, self.batch_size)
+        else:
+            epsilon = regime.get_error_linear(rate, dimension, self.field)
 
         # grinding
         epsilon *= 2 ** (-self.grinding_bits_batching)
@@ -438,7 +438,7 @@ class WHIRBasedVM(zkVM):
 
         return epsilon
 
-    def epsilon_fin(self, regime: ProximityGapsRegime) -> float:
+    def epsilon_final(self, regime: ProximityGapsRegime) -> float:
         """
         Returns the error epsilon^fin from the paper (Theorem 5.2 in WHIR paper).
         """
@@ -453,8 +453,8 @@ class WHIRBasedVM(zkVM):
 
     def get_log_grinding_overhead(self) -> float:
         """
-        Determine the total grinding overhead, which is the sum of all individual grinding overheads.
-        The grinding overhead for c bits of grinding is 2^c.
+        Determine the total grinding overhead to the prover time, which is the sum of all individual grinding
+        overheads. The grinding overhead for c bits of grinding is 2^c.
         """
         grinding_sum = 0
 

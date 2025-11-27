@@ -284,9 +284,10 @@ class FRIBasedVM(zkVM):
         rate = self.rho
         dimension = self.trace_length
 
-        epsilon = regime.get_error_linear(rate, dimension, self.field)
         if self.power_batching:
             epsilon = regime.get_error_powers(rate, dimension, self.field, self.batch_size)
+        else:
+            epsilon = regime.get_error_linear(rate, dimension, self.field)
 
         return epsilon
 
