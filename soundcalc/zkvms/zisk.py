@@ -5,6 +5,61 @@ from soundcalc.zkvms.fri_based_vm import FRIBasedCircuit, FRIBasedVM, FRIBasedVM
 from ..common.fields import *
 
 
+def _parse_fri_folding_arities(fri_fa_str: str) -> tuple[list[int], int]:
+    """
+    Parse FRI folding arity string like "23-19-15-11-8-5" into folding factors and early stop degree.
+
+    The sequence represents log2 of domain sizes at each step.
+    E.g., "23-19-15-11-8-5" means:
+      - 23→19: fold by 2^(23-19) = 16
+      - 19→15: fold by 2^4 = 16
+      - 15→11: fold by 2^4 = 16
+      - 11→8: fold by 2^3 = 8
+      - 8→5: fold by 2^3 = 8
+      - Final 5: early_stop_degree = 2^5 = 32
+    """
+    values = [int(x) for x in fri_fa_str.split('-')]
+    folding_factors = []
+    for i in range(len(values) - 1):
+        fold_log = values[i] - values[i + 1]
+        folding_factors.append(1 << fold_log)
+    early_stop_degree = 1 << values[-1]
+    return folding_factors, early_stop_degree
+
+
+def _make_circuit(name, bits, bf, d, fixed, stage1, pols, queries, opens, fri_fa) -> FRIBasedCircuit:
+    """Factory function to create a circuit from table parameters."""
+    FRI_folding_factors, FRI_early_stop_degree = _parse_fri_folding_arities(fri_fa)
+
+    return FRIBasedCircuit(FRIBasedVMConfig(
+        name=name,
+        trace_length=1 << bits,
+        rho=1 / (1 << bf),
+        AIR_max_degree=d,
+        num_columns=fixed + stage1,
+        batch_size=pols,
+        num_queries=queries,
+        max_combo=opens,
+        FRI_folding_factors=FRI_folding_factors,
+        FRI_early_stop_degree=FRI_early_stop_degree,
+        field=GOLDILOCKS_3,
+        hash_size_bits=256,
+        power_batching=True,
+        grinding_query_phase=0,
+    ))
+
+
+# Base ZisK circuits
+# Columns: (name, bits, bf, d, fixed, stage1, pols, queries, opens, fri_fa)
+#
+# Aligned for better reading:
+#                              bits bf  d  fix stg1  pols  qry opn  fri_fa
+ZISK_BASE_CIRCUITS = [
+    ("Main",                    22,  1, 3,   3,  38,   61, 128,  3, "23-19-15-11-8-5"),
+    ("Rom",                     22,  1, 2,   1,   1,   18, 128,  3, "23-19-15-11-8-5"),
+]
+
+
 class ZiskPreset:
     @staticmethod
     def default() -> FRIBasedVM:
@@ -17,107 +72,30 @@ class ZiskPreset:
         The rest of the parameters are adapted from the "eSTARK: Extending STARKs with Arguments" paper:
            https://eprint.iacr.org/2023/474
         """
-        return FRIBasedVM(
-            name="ZisK",
-            circuits=[
-                ZiskPreset._main_circuit(),
-                ZiskPreset._secondary_circuit(),
-            ]
-        )
+        circuits = [_make_circuit(*row) for row in ZISK_BASE_CIRCUITS]
+        return FRIBasedVM(name="ZisK", circuits=circuits)
 
-    @staticmethod
-    def _main_circuit() -> FRIBasedCircuit:
-        """
-        Main ZisK circuit - the largest trace.
-        """
-        field = GOLDILOCKS_3
 
-        # The blowup factor is dinamically chosen by this tool:
-        #       https://github.com/0xPolygonHermez/pil2-proofman-js/blob/main/src/pil2-stark/pil_info/imPolsCalculation/imPolynomials.js#L96
-        # by chosing the one (greater or equal than 2) that yields the lowest number of columns.
-        # Here we just fix it to 2 for simplicity.
-        blowup_factor = 2
-        rho = 1 / blowup_factor
+if __name__ == "__main__":
+    import unittest
 
-        trace_length = 1 << 22
-        num_columns = 66
-        batch_size = num_columns + 2  # +2 for the composition polynomials
+    class TestParseFriFoldingArities(unittest.TestCase):
+        def test_main_circuit_fri_fa(self):
+            # 23-19-15-11-8-5: folds by 16,16,16,8,8 then stops at degree 32
+            factors, early_stop = _parse_fri_folding_arities("23-19-15-11-8-5")
+            self.assertEqual(factors, [16, 16, 16, 8, 8])
+            self.assertEqual(early_stop, 32)
 
-        num_queries = 128 // int(math.log2(blowup_factor))
+        def test_short_fri_fa(self):
+            # 17-13-9-5: folds by 16,16,16 then stops at degree 32
+            factors, early_stop = _parse_fri_folding_arities("17-13-9-5")
+            self.assertEqual(factors, [16, 16, 16])
+            self.assertEqual(early_stop, 32)
 
-        AIR_max_degree = blowup_factor + 1
+        def test_final_circuit_fri_fa(self):
+            # 20-15-10: folds by 32,32 then stops at degree 1024
+            factors, early_stop = _parse_fri_folding_arities("20-15-10")
+            self.assertEqual(factors, [32, 32])
+            self.assertEqual(early_stop, 1024)
 
-        # D = trace_length / rho = 2^23
-        # Product of factors should equal D / early_stop = 2^23 / 2^5 = 2^18
-        # [16, 16, 16, 8, 8] = 2^4 * 2^4 * 2^4 * 2^3 * 2^3 = 2^18 ✓
-        FRI_folding_factors = [2**4, 2**4, 2**4, 2**3, 2**3]
-        FRI_early_stop_degree = 2**5
-
-        max_combo = 3
-
-        hash_size_bits = 256  # TODO: check if that is actually true
-
-        cfg = FRIBasedVMConfig(
-            name="main",
-            hash_size_bits=hash_size_bits,
-            rho=rho,
-            trace_length=trace_length,
-            field=field,
-            num_columns=num_columns,
-            batch_size=batch_size,
-            power_batching=True,
-            num_queries=num_queries,
-            AIR_max_degree=AIR_max_degree,
-            FRI_folding_factors=FRI_folding_factors,
-            FRI_early_stop_degree=FRI_early_stop_degree,
-            max_combo=max_combo,
-            grinding_query_phase=0,
-        )
-        return FRIBasedCircuit(cfg)
-
-    @staticmethod
-    def _secondary_circuit() -> FRIBasedCircuit:
-        """
-        Secondary ZisK circuit - smaller trace (placeholder values).
-        """
-        field = GOLDILOCKS_3
-
-        blowup_factor = 2
-        rho = 1 / blowup_factor
-
-        trace_length = 1 << 21  # Smaller trace
-        num_columns = 50  # Fewer columns
-        batch_size = num_columns + 2
-
-        num_queries = 128 // int(math.log2(blowup_factor))
-
-        AIR_max_degree = blowup_factor + 1
-
-        # D = trace_length / rho = 2^22
-        # Product of factors should equal D / early_stop = 2^22 / 2^5 = 2^17
-        # [16, 16, 16, 8] = 2^4 * 2^4 * 2^4 * 2^3 = 2^15... need adjustment
-        # [16, 16, 8, 8, 8] = 2^4 * 2^4 * 2^3 * 2^3 * 2^3 = 2^17 ✓
-        FRI_folding_factors = [2**4, 2**4, 2**3, 2**3, 2**3]
-        FRI_early_stop_degree = 2**5
-
-        max_combo = 3
-
-        hash_size_bits = 256
-
-        cfg = FRIBasedVMConfig(
-            name="secondary",
-            hash_size_bits=hash_size_bits,
-            rho=rho,
-            trace_length=trace_length,
-            field=field,
-            num_columns=num_columns,
-            batch_size=batch_size,
-            power_batching=True,
-            num_queries=num_queries,
-            AIR_max_degree=AIR_max_degree,
-            FRI_folding_factors=FRI_folding_factors,
-            FRI_early_stop_degree=FRI_early_stop_degree,
-            max_combo=max_combo,
-            grinding_query_phase=0,
-        )
-        return FRIBasedCircuit(cfg)
+    unittest.main()
