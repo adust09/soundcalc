@@ -15,7 +15,7 @@ class JohnsonBoundRegime(ProximityGapsRegime):
         sqrt_rate = math.sqrt(rate)
 
         # TODO: Let's use a heuristic to figure out the proximity parameter here.
-        # If we are working over a large field (|F| > 2^15), use a tiny gap from JB: 1/n
+        # If we are working over a large field (|F| > 2^150), use a tiny gap from JB: 1/n
         # Otherwise, use a more conservative rho/20.
         if self.field.F > 2**150:
             gap = 1 / n
