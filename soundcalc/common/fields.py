@@ -33,6 +33,7 @@ def _F(p: int, ext_size: int) -> float:
 # Base fields
 GOLDILOCKS_P = (1 << 64) - (1 << 32) + 1
 BABYBEAR_P = (1 << 31) - (1 << 27) + 1
+KOALABEAR_P = (1 << 31) - (1 << 24) + 1
 
 
 # Preset extension fields
@@ -64,6 +65,13 @@ BABYBEAR_5 = FieldParams(
     F=_F(BABYBEAR_P, 5),
 )
 
+KOALABEAR_4 = FieldParams(
+    name="KoalaBear⁴",
+    p=KOALABEAR_P,
+    field_extension_degree=4,
+    F=_F(KOALABEAR_P, 4),
+)
+
 
 def field_element_size_bits(field: FieldParams) -> int:
     """
@@ -78,6 +86,7 @@ FIELD_MAP = {
     "Goldilocks^3": GOLDILOCKS_3,
     "BabyBear^4": BABYBEAR_4,
     "BabyBear^5": BABYBEAR_5,
+    "KoalaBear^4": KOALABEAR_4,
 }
 
 
