@@ -181,5 +181,6 @@ def _test_get_FRI_proof_size_bits():
     print("Test `_test_get_FRI_proof_size_bits` passed")
 
 
-
-_test_get_FRI_proof_size_bits()
+# Can be run with `python3 -m soundcalc.common.fri`
+if __name__ == "__main__":
+    _test_get_FRI_proof_size_bits()
