@@ -64,10 +64,9 @@ def get_FRI_proof_size_bits(
         field_size_bits: int,
         batch_size: int,
         num_queries: int,
-        witness_size: int,
-        field_extension_degree: int,
-        early_stop_degree: int,
+        domain_size: int,
         folding_factors: list[int],
+        rate: int
 ) -> int:
 
     """
@@ -88,33 +87,33 @@ def get_FRI_proof_size_bits(
     # Initial Round: one root and one path per query
     # We assume that for the initial functions, there is only one Merkle root, and
     # each leaf i for that root contains symbols i for all initial functions.
-    n = int(witness_size)
-    num_leafs = n // int(folding_factors[0])
+    n = int(domain_size)
+    num_leafs = n
     tuple_size = batch_size
     size_bits += hash_size_bits + num_queries * get_size_of_merkle_path_bits(num_leafs, tuple_size, field_size_bits, hash_size_bits)
 
+    # Now we have folded these batch_size initial functions into one
+    # Next, we start with the folding rounds.
 
-    # Folding rounds
     # We assume that "siblings" for the following layers are grouped together
     # in one leaf. This is natural as they always need to be opened together.
 
-    # TODO: need to check if that is actually the correct loop
-    i = 1
-    n_rounds = len(folding_factors)
-    while i < n_rounds:
-        assert(n // int(folding_factors[i]) >= int(early_stop_degree))
+    rounds = len(folding_factors)
+    for i in range(rounds):
 
-        n //= int(folding_factors[i])
+        # in our current domain, we group together all siblings (sometimes denoted Block(z) in the literature)
+        num_leafs = n // int(folding_factors[i])
         tuple_size = folding_factors[i]
-
-        # Get number of leafs. If we are in the last round of FRI, we need to use the early stop number
-        if i + 1 < n_rounds:
-            num_leafs = n // int(folding_factors[i])
-        else:
-            num_leafs = n
 
         # one root and one path per query
         size_bits += hash_size_bits + num_queries * get_size_of_merkle_path_bits(num_leafs, tuple_size, field_size_bits, hash_size_bits)
-        i += 1
+
+        # next domain size is given by applying folding
+        n = n // int(folding_factors[i])
+
+    # for the final round, we send the function in the clear.
+    # note that we don't need to send the full function, but can just send
+    # the polynomial that describes it
+    size_bits += rate * n * field_size_bits
 
     return size_bits

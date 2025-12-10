@@ -1,0 +1,291 @@
+\newpage
+
+\section{WHIR-based VM security level calculation}\label{sec:whir_security_level}
+
+
+
+
+\subsection{Notation and parameters}\label{sec:whir_notation}
+
+\begin{itemize}
+  \item Number of iterations: \(M = \texttt{num\_iterations}\)
+  \item Iteration index: \(i \in \{0,\dots,M-1\}\)
+  \item Folding round index: \(s \in \{0,\dots,k-1\}\)
+  \item Field size: \(|\mathbb{F}| = q\)
+  \item Constraint degree: \(d = \texttt{constraint\_degree}\)
+  \item Folding factor: \(k = \texttt{folding\_factor}\)
+  \item Log-degree in iteration \(i\): \(m_i = \texttt{log\_degrees}[i]\), and we set $m_i = m_0-k\cdot i$
+  \item Log-inverted rate in iteration \(i\): \(\mu_i = \texttt{log\_inv\_rates}[i]\) , and we set $\mu_i = \log_2 \frac{1}{\rho}+(k-1)\cdot i$
+  \item Iteration-round-specific RS codes:
+  $$
+  \CC_{i,s}=(\CC_{i,s}[\rho],\CC_{i,s}[N])_{i,s}=(2^{-\mu_i},2^{m_i-s})
+  $$
+  \item Number of OOD samples in iteration \(i\): \(w_i = \texttt{num\_ood\_samples}[i]\)
+  \item Number of queries in iteration \(i\): \(t_i = \texttt{num\_queries}[i]\)
+  \item Grinding bits:
+    \[
+      g_{\mathrm{batch}},\quad
+      \{g^{\mathrm{fold}}_{i,s}\}_{i\in [M],s\in[k]},\quad
+      \{g^{\mathrm{ood}}_i\}_{i\in M},\quad
+      \{g^{\mathrm{qry}}_i\}_{i\in M}.
+    \]
+\end{itemize}
+
+
+
+\subsection{Bits of Security in UDR and JBR}
+
+In order to compute the bits of security in UDR and JBR regimes, we compute the following error terms using the parameters from \cref{sec:whir_notation}.
+
+Computed in \verb|get_security_levels_for_regime()|.
+
+For any error term:
+\[
+  \lambda(\epsilon)
+  = \lfloor-\log_2\epsilon\rfloor.
+\]
+
+Overall security:
+\[
+  \lambda_{\mathrm{total}}
+    = \min\{
+      \lambda_{\mathrm{batch}},
+      \{\lambda^{\mathrm{fold}}_{i,s}\}_{i\in [M],s\in[k]},
+      \{\lambda^{\mathrm{out}}_i\}_{i\in \{1,\ldots,M-1\}},
+      \{\lambda^{\mathrm{shift}}_i\}_{i\in \{1,\ldots,M-1\}},
+      \lambda^{\mathrm{fin}}
+    \}.
+\]
+
+\subsection{Batching Error \(\epsilon_{\mathrm{batch}}\)}
+
+This computes the batching error with parameters from \cref{sec:whir_notation}.
+\verb|get_batching_error()|
+
+In the Johnson Bound Regime (JBR) we proceed as follows:
+\begin{itemize}
+    \item Set code parameters $$
+    (\rho,N)= \left(2^{-\mu_0}, 2^{m_0}\right)
+    $$
+    \item Compute base error (cf. \cref{sec:batch}):
+\[
+\varepsilon_{\mathrm{batch}, JBR}^{\text{base}} =
+\begin{cases}
+   \ebatchpowJ(\rho,N,q,B) & \text{(power batching)}, \\[4pt]
+  \ebatchlinJ(\rho,N,q)& \text{(linear batching)}.
+\end{cases}
+\]
+\end{itemize}
+Whereas in the UDR we do as follows:
+\begin{itemize}
+    \item Compute base error (cf. \cref{sec:batch}):
+\[
+\varepsilon_{\mathrm{batch}, UDR}^{\text{base}} =
+\begin{cases}
+   \ebatchpowU & \text{(power batching)}, \\[4pt]
+  \ebatchlinU& \text{(linear batching)}.
+\end{cases}
+\]
+\end{itemize}
+
+In both regimes we do as follows after grinding:
+\[
+  \epsilon_{\mathrm{batch}}
+  = \varepsilon_{\mathrm{batch}}^{\text{base}}
+    \cdot 2^{-g_{\mathrm{batch}}}.
+\]
+\subsection{Folding Error}
+
+This section computes the error of a folding round as in \verb|whir_based_vm.py/epsilon_fold()|, referring to Theorem 5.2 of the WHIR paper.
+
+For iteration \(i\in[M]\) and folding round \(s\in[k]\) in JBR we do\footnote{The function \texttt{epsilon\_fold()}
+counts folding rounds from \(1\) to \(k\), whereas here we count from \(0\) to \(k-1\).    }:
+\begin{itemize}
+    \item % \verb|get_list_size_for_iteration_and_round()|
+ %   \begin{itemize}
+   % \item
+    Get list size as in \cref{sec:fri_list_sizes}
+    $$
+    \ell_{i,s} =\ell(\CC_{i,s}[\rho])
+    $$
+  %  \end{itemize}
+    \item
+Base error (two terms):
+\[
+  \varepsilon^{\mathrm{fold,base,J}}_{i,s}
+    = d \cdot \frac{\ell_{i,s}}{q}
+      + \ebatchpowJ(\CC_{i,s+1}[\rho],\CC_{i,s+1}[N],q,B=2).
+\]
+\end{itemize} And in UDR the base error is
+
+\[
+  \varepsilon^{\mathrm{fold,base,U}}_{i,s}
+    =  \frac{d}{q}
+      + \ebatchpowU(\CC_{i,s+1}[\rho],\CC_{i,s+1}[N],q,B=2).
+\]
+
+After grinding:
+\[
+  \epsilon^{\mathrm{fold}}_{i,s}
+    = \varepsilon^{\mathrm{fold,base}}_{i,s}
+      \cdot 2^{-g^{\mathrm{fold}}_{i,s}}.
+\]
+
+\subsection{OOD error }
+
+This computes the Out-of-Domain error  as in \verb|whir_based_vm.py/epsilon_out()|.
+
+For iteration \(i\in\{1,2,\ldots,M-1\}\)
+\begin{itemize}
+    \item
+Base error in JBR (cf. \cref{sec:fri_list_sizes}):
+\[
+  \varepsilon^{\mathrm{out,base,J}}_i
+  = \ell_{i,0}^2
+    \left(\frac{2^{m_i}}{2q}\right)^{w_{i-1}}.
+\]
+\item Base error in UDR:
+\[
+  \varepsilon^{\mathrm{out,base,U}}_i
+  =  \left(\frac{2^{m_i}}{2q}\right)^{w_{i-1}}.
+\]
+\item After grinding:
+\[
+  \epsilon^{\mathrm{out}}_i
+  = \varepsilon^{\mathrm{out,base}}_i
+    \cdot 2^{-g^{\mathrm{ood}}_{i-1}}.
+\]
+
+\end{itemize}
+\subsection{Shift Error}
+
+\verb|epsilon_shift()|
+
+For iteration \(i\in\{1,2,\ldots,M-1\}\) in JBR
+\begin{itemize}
+    \item   Get $\delta$ for the iteration using \eqref{eq:pp_jbr}:
+    $$
+    \delta_i =\min_{s\in[k+1]}\delta_J(\CC_{i-1,s}[\rho],\CC_{i-1,s}[N],q)
+    $$
+\item Base error (two terms):
+\[
+  \varepsilon^{\mathrm{shift,base}}_i
+    = (1 - \delta_i )^{t_{i-1}}
+      + \ell_{i,0} \cdot \frac{t_{i-1} + 1}{  q}.
+\]
+
+\end{itemize}
+
+Same procedure in UDR:
+\begin{itemize}
+    \item   Get $\delta$ for the iteration using \eqref{eq:pp_udr}:
+    $$
+    \delta_i =\min_{s\in[k+1]}\delta_U(\CC_{i-1,s}[\rho])
+    $$
+\item Base error  :
+\[
+  \varepsilon^{\mathrm{shift,base}}_i
+    = (1 - \delta_i )^{t_{i-1}}
+      +   \frac{t_{i-1} + 1}{q}.
+\]
+
+\end{itemize}
+
+ After grinding:
+\[
+  \epsilon^{\mathrm{shift}}_i
+    = \varepsilon^{\mathrm{shift,base}}_i
+      \cdot 2^{-g^{\mathrm{qry}}_{i-1}}.
+\]
+
+
+\subsection{Final Round Error }
+\verb|epsilon_final()|
+
+JBR:
+\begin{itemize}
+    \item  Get $\delta$ for the iteration using \eqref{eq:pp_jbr}:
+    $$
+    \delta_{M-1} =\min_{s\in[k+1]}\delta_J(\CC_{M-1,s}[\rho])
+    $$
+\end{itemize}
+UDR:
+ \begin{itemize}
+    \item  Get $\delta$ for the iteration using \eqref{eq:pp_udr}:
+    $$
+    \delta_{M-1} =\min_{s\in[k+1]}\delta_U(\CC_{M-1,s}[\rho])
+    $$
+\end{itemize}
+Then
+the base error is :
+\[
+  \varepsilon^{\mathrm{fin,base}}
+    = (1 - \delta_{M-1})^{t_{M-1}}.
+\]
+After grinding:
+\[
+  \epsilon^{\mathrm{fin}}
+  = (1 - \delta_{M-1})^{t_{M-1}}
+    \cdot 2^{-g^{\mathrm{qry}}_{M-1}}.
+\]
+\section{WHIR Proof Size Calculations}
+
+This section summarizes the proof-size formula computed in \verb|get_proof_size_bits()|.
+
+\subsection{Initial Function  Size}
+\[
+  S_{\mathrm{if}} = \bhash.
+\]
+
+\subsection{Initial Sumcheck Size}
+
+
+Thus the folding proof size per round is
+\[
+  S_{\mathrm{sumcheck}} = k(d-1)q.
+\]
+
+\subsection{OOD Proof Size for Iteration \(i\)}
+
+\[
+  S_{\mathrm{ood},i}
+    = \bhash+w_iq+k(d-1)q
+\]
+
+$$
+S_{\mathrm{ood},M}=2^{m_M}q
+$$
+
+\subsection{Query Proof Size for Iteration \(i\)}
+
+
+Thus
+\[
+  S_{\mathrm{qry},i}
+    =\begin{cases} t_i \cdot MP(2^{m_i+\mu_i-k},2^k,\log_2 q,\bhash).\quad i>0\\
+    t_i \cdot MP(2^{m_0+\mu_0-k},2^k,\log_2 p,\bhash).\quad M=1
+    \end{cases}
+\]where $p$ is characteristic of the field $\FFF_q$.
+
+
+\subsection{Total Proof Size}
+
+Collecting all terms and summing over all \(M\) iterations:
+
+\[
+\boxed{
+S_{\mathrm{total}}
+  = S_{\mathrm{if}}+S_{\mathrm{sumcheck}}
+    + \sum_{i\in[M]}
+      \left(
+         S_{\mathrm{ood},i}
+        + S_{\mathrm{qry},i}
+      \right)
+}
+\]
+
+
+%Expanding,$$
+%\swhirtotal=\bhash + k(d-1)q+2^{m_M}q+\sum_{i\in[M-1]}\left(\bhash+w_i\cdot q +k(d-1)q  \right)
+%+\sum_{i\in[M]}\left(t_i \cdot MP(2^{m_i+\mu_i-k},2^k,\log_2 q,\bhash)   \right)
+%$$

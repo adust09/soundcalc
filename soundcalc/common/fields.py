@@ -4,8 +4,8 @@ Preset finite fields to be used by the zkEVM configs
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -17,12 +17,28 @@ class FieldParams:
     field_extension_degree: int
     # Extension field size |F| = p^{ext_size}
     F: float
+    # Two-adicity of the multiplicative group (largest s such that 2^s divides p-1)
+    #
+    # This determines the maximum possible FFT domain size.
+    two_adicity: int
 
     def to_string(self) -> str:
         """
         Returns a human-readable string representing the field,
         """
         return self.name
+
+    def base_field_element_size_bits(self) -> int:
+        """
+        Returns the size of a base field element in bits.
+        """
+        return math.ceil(math.log2(self.p))
+
+    def extension_field_element_size_bits(self) -> int:
+        """
+        Returns the size of an extension field element in bits.
+        """
+        return self.base_field_element_size_bits() * self.field_extension_degree
 
 
 def _F(p: int, ext_size: int) -> float:
@@ -32,9 +48,16 @@ def _F(p: int, ext_size: int) -> float:
 
 # Base fields
 GOLDILOCKS_P = (1 << 64) - (1 << 32) + 1
-BABYBEAR_P = (1 << 31) - (1 << 27) + 1
-KOALABEAR_P = (1 << 31) - (1 << 24) + 1
+# Goldilocks 2-adicity: 2^64 - 2^32 = 2^32 * (2^32 - 1). 32 is the max power of 2.
+GOLDILOCKS_TWO_ADICITY = 32
 
+BABYBEAR_P = (1 << 31) - (1 << 27) + 1
+# BabyBear 2-adicity: 2^31 - 2^27 = 2^27 * (2^4 - 1). 27 is the max power of 2.
+BABYBEAR_TWO_ADICITY = 27
+
+KOALABEAR_P = (1 << 31) - (1 << 24) + 1
+# KoalaBear 2-adicity: 2^31 - 2^24 = 2^24 * (2^7 - 1). 24 is the max power of 2.
+KOALABEAR_TWO_ADICITY = 24
 
 # Preset extension fields
 GOLDILOCKS_2 = FieldParams(
@@ -42,6 +65,7 @@ GOLDILOCKS_2 = FieldParams(
     p=GOLDILOCKS_P,
     field_extension_degree=2,
     F=_F(GOLDILOCKS_P, 2),
+    two_adicity=GOLDILOCKS_TWO_ADICITY,
 )
 
 GOLDILOCKS_3 = FieldParams(
@@ -49,6 +73,7 @@ GOLDILOCKS_3 = FieldParams(
     p=GOLDILOCKS_P,
     field_extension_degree=3,
     F=_F(GOLDILOCKS_P, 3),
+    two_adicity=GOLDILOCKS_TWO_ADICITY,
 )
 
 BABYBEAR_4 = FieldParams(
@@ -56,6 +81,7 @@ BABYBEAR_4 = FieldParams(
     p=BABYBEAR_P,
     field_extension_degree=4,
     F=_F(BABYBEAR_P, 4),
+    two_adicity=BABYBEAR_TWO_ADICITY,
 )
 
 BABYBEAR_5 = FieldParams(
@@ -63,6 +89,7 @@ BABYBEAR_5 = FieldParams(
     p=BABYBEAR_P,
     field_extension_degree=5,
     F=_F(BABYBEAR_P, 5),
+    two_adicity=BABYBEAR_TWO_ADICITY,
 )
 
 KOALABEAR_4 = FieldParams(
@@ -70,15 +97,8 @@ KOALABEAR_4 = FieldParams(
     p=KOALABEAR_P,
     field_extension_degree=4,
     F=_F(KOALABEAR_P, 4),
+    two_adicity=KOALABEAR_TWO_ADICITY,
 )
-
-
-def field_element_size_bits(field: FieldParams) -> int:
-    """
-    Returns the size of a field element in bits.
-    """
-    return math.ceil(math.log2(field.p)) * field.field_extension_degree
-
 
 # Map field strings (as used in TOML configs) to FieldParams
 FIELD_MAP = {

@@ -1,0 +1,136 @@
+\newpage
+\section{FRI-based VM security level calculation}
+
+This section calculates the security level for a FRI-based VM in \cref{sec:fri_security_level}.
+
+\subsection{FRI parameters}
+
+Global parameters used in the FRI analysis:
+\begin{itemize}
+ %   \item $m_J$ --- Johnson parameter.
+    \item $r_{FRI}$ --- number of FRI rounds.
+    \item Folding factors $\folds=[k_0,k_1,\ldots,k_{r_{FRI}-1}]$;
+    \item $t$ --- number of queries.
+    \item $\delta$ --- proximity parameter.
+    \item $\rho$ --- rate of the Reed-Solomon code.
+    \item $N$ --- trace length.
+    \item $\ell$ --- list size.
+    \item $\bgriq$ --- grinding parameter for the query phase.
+    \item $n$ --- witness size.
+    \item $\bhash$ --- number of bits in the hash function output.
+    \item $\bproof$ --- proof size in bits.
+    \item $\sbtch$ --- batch size.
+\end{itemize}
+
+
+
+
+\subsection{Security level for a FRI-based VM}\label{sec:fri_security_level}
+
+The security level is calculated in \begin{verbatim}zkvms/fri_based_vm.py/get_security_levels()\end{verbatim}.
+
+It is done separately for two different regimes: UDR and JBR --- using the same procedure \verb|fri_based_vm.py/get_security_levels_for_regime()|:
+\begin{enumerate}
+    \item Calculate the FRI round-by-round soundness errors $\efrirbr $:
+    $$
+    \efrirbr =\max(\ebatch,  \{\epsilon_{i}^{\mathrm{fold}}\}_{i\in[r_{FRI}]}, \equery)
+     $$
+    \item Obtain optimal $\delta $ proximity parameter as by   \cref{sec:fri_optimal_distance_udr}.
+    \item Obtain the list size $\ell$ for the respective  $\delta $ as  by \cref{sec:fri_list_sizes}.
+    \item Obtain the DEEP-ALI soundness error $\edeep$ as by \cref{sec:fri-deep-ali}.
+    \item Compute the total soundness error as
+     $$
+    \epsilon  = \max(\efrirbr, \edeep) .
+    $$
+\end{enumerate}
+Then the  full security level in bits is the maximum of the two regimes:
+$$
+\text{Security level} = \max(-\log_2 \epsilon_U, -\log_2 \epsilon_J).
+$$
+
+\subsubsection{DEEP-ALI errors}\label{sec:fri-deep-ali}
+\begin{verbatim}fri_based_vm.py/get_DEEP_ALI_errors()\end{verbatim}
+
+The DEEP-ALI soundness error is computed as follows:
+\begin{equation}
+    \edeep = \max\left(\frac{L^{+}\cdot C}{q}, \frac{L^{+}(d(N+m_c-1)+(N-1))}{q-N-D}\right)
+\end{equation}
+
+
+\subsection{Batching Error }
+
+This computes the batching error with parameters from \cref{sec:whir_notation}.
+\verb|get_batching_error()|
+
+In the Johnson Bound Regime (JBR) we compute base error as:
+\[
+\ebatch^{\text{base,JBR}} =
+\begin{cases}
+   \ebatchpowJ(\rho,N,q,B) & \text{(power batching)}, \\[4pt]
+  \ebatchlinJ(\rho,N,q)& \text{(linear batching)}.
+\end{cases}
+\]
+Whereas in the UDR we compute base error:
+\[
+\ebatch^{\text{base,UDR}}=
+\begin{cases}
+   \ebatchpowU(\rho,N,q,B) & \text{(power batching)}, \\[4pt]
+  \ebatchlinU(\rho,N,q)& \text{(linear batching)}.
+\end{cases}
+\]
+
+\subsection{Folding errors}
+
+This is calculated in \verb|fri_based_vm.py/get_commit_phase_error()|.
+
+For round $i\in[r_{FRI}]$ we compute the dimension $N_i$ as
+$$
+N_i = \frac{N}{\prod_{j\in[i]}k_j}
+$$
+Then the folding error in round $i$ is computed as
+\begin{equation}
+    \epsilon_{i}^{\mathrm{fold}} =
+\begin{cases}
+   \ebatchpowJ(\rho,N_i,q,k_i ),\quad \text{JBR}, \\
+   \ebatchpowU(\rho,N_i,q,k_i ),\quad \text{UDR}
+\end{cases}
+\end{equation}
+
+\subsection{Query error}
+
+This is calculated in \verb|fri_based_vm.py/get_query_phase_error()|.
+
+Query phase error:
+\begin{equation}
+    \epsilon_{\mathrm{query}} = (1-\theta)^{t}\cdot 2^{-\bgriq}
+\end{equation}
+
+\section{FRI proof size}
+
+This calculation is performed in \begin{verbatim}fri.py/get_FRI_proof_size_bits()\end{verbatim}.
+The FRI proof contains two parts: Merkle roots, and one "openings" per query,
+  where an "opening" is a Merkle path for each folding layer.
+     For each layer we count the size that
+     this layer contributes, which includes the root and all Merkle paths.
+
+Initial round: one root and one path per query.
+     We assume that for the initial functions, there is only one Merkle root, and
+     each leaf $i$ for that root contains symbols $i$ for all initial functions.
+
+    Folding rounds:
+     we assume that "siblings" for the following layers are grouped together
+     in one leaf. This is natural as they always need to be opened together.
+
+The proof size is calculated as follows:
+\begin{multline}
+    \bproof =   \underbrace{ \bhash+ t\cdot MP(\frac{n}{\folds[0]},\sbtch,  q,\bhash)}_{\text{Initial round}} + \\
+    +\underbrace{\sum_{1\leq i \leq r_{FRI}-2} \left(\bhash+
+     t\cdot MP(\frac{n}{\prod_{0\leq j \leq  i} \folds[j]},\sbtch, q,\bhash)\right)}_{\text{Folding rounds but last }}+\\
+    +\underbrace{ \left(\bhash+
+     t\cdot MP(\frac{n}{ \prod_{0\leq j \leq  r_{FRI}-1} \folds[j]},\sbtch,q,\bhash)\right)}_{\text{Last folding round }}
+    \end{multline}
+where $MP(n, s, q, b)$ is the Merkle path size
+calculated as
+\begin{equation}
+    MP(n,s,q,b) =   \underbrace{sq}_{\text{leaf size}}+\underbrace{sq}_{\text{sibling}}+ \underbrace{\left\lceil \log_2 n \right \rceil \cdot b}_{\text{co-path}}
+\end{equation}
