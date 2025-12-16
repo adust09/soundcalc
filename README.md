@@ -15,6 +15,8 @@ It aims to answer questions like:
 You can run the calculator by doing `python3 -m soundcalc`.
 As a result, the calculator generates / updates reports in [`reports/`](reports/).
 
+## Tests
+
 Tests can be run with `pytest`.
 
 ## Supported systems
@@ -29,7 +31,6 @@ We support the following security regimes (see below for explanation of regimes)
 - Unique Decoding Regime (UDR)
 - Johnson Bound Regime (JBR)
 
-In addition, we give a number based on the ethstark toy problem conjecture for reference.
 
 ## Background on Security Regimes
 
@@ -43,10 +44,8 @@ Depending on the value of `θ`, the analysis falls into different regimes:
 - **JBR (Johnson Bound Regime):** $(1 - \rho)/2 < \theta < 1 - \sqrt{\rho}$.
 
 Crucially, `θ` is not an input to the prover or verifier code—it is only used in the *soundness analysis*.
-All three regimes therefore apply to the *same zkEVM instance* without any change.
+All regimes therefore apply to the *same zkEVM instance* without any change.
 
-We also output the security level estimated by considering the currently best known attack.
-Here, we currently follow the **Toy Problem Regime (TPR) / ethSTARK conjecture**.
 
 ## Incorporation of recent work
 
