@@ -1,29 +1,73 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import toml
+
+from soundcalc.common.fields import parse_field
+from soundcalc.common.utils import get_bits_of_security_from_error
+from soundcalc.pcs.pcs import PCS
+from soundcalc.pcs.fri import FRI, FRIConfig
+from soundcalc.pcs.whir import WHIR, WHIRConfig
+from soundcalc.proxgaps.johnson_bound import JohnsonBoundRegime
+from soundcalc.proxgaps.unique_decoding import UniqueDecodingRegime
 
 
-class Circuit(ABC):
+@dataclass
+class CircuitConfig:
+    """Configuration for a Circuit."""
+    name: str
+    pcs: PCS
+    # Total columns of AIR table (used in DEEP-ALI soundness)
+    num_columns: int | None = None
+    # Maximum constraint degree
+    AIR_max_degree: int | None = None
+    # Maximum number of entries from a single column referenced in a single constraint
+    max_combo: int | None = None
+
+
+class Circuit:
     """
     A class modeling a single circuit within a zkVM.
     Each circuit has its own parameters and security analysis.
     """
 
-    @abstractmethod
+    def __init__(self, config: CircuitConfig):
+        self.name = config.name
+        self.pcs = config.pcs
+        # Store optional DEEP-ALI params
+        self.num_columns = config.num_columns
+        self.AIR_max_degree = config.AIR_max_degree
+        self.max_combo = config.max_combo
+
     def get_name(self) -> str:
         """Returns the name of the circuit."""
-        ...
+        return self.name
 
-    @abstractmethod
     def get_parameter_summary(self) -> str:
         """Returns a description of the parameters of the circuit."""
-        ...
+        pcs_summary = self.pcs.get_parameter_summary()
+        if self._has_deep_ali_params():
+            # Insert DEEP-ALI params into the summary
+            lines = pcs_summary.split("\n")
+            # Find the closing ``` and insert before it
+            for i, line in enumerate(lines):
+                if line.strip() == "```" and i > 0:
+                    deep_ali_lines = [
+                        f"  num_columns                        : {self.num_columns}",
+                        f"  AIR_max_degree                     : {self.AIR_max_degree}",
+                        f"  max_combo                          : {self.max_combo}",
+                    ]
+                    lines = lines[:i] + deep_ali_lines + lines[i:]
+                    break
+            return "\n".join(lines)
+        return pcs_summary
 
-    @abstractmethod
     def get_proof_size_bits(self) -> int:
         """Returns an estimate for the proof size, given in bits."""
-        ...
+        return self.pcs.get_proof_size_bits()
 
-    @abstractmethod
     def get_security_levels(self) -> dict[str, dict[str, int]]:
         """
         Returns a dictionary that maps each regime (i.e., a way of doing security analysis)
@@ -36,20 +80,151 @@ class Circuit(ABC):
         If this integer is, say, k, then it means the error for this round is at
         most 2^{-k}.
         """
-        ...
+        field = self.pcs.get_field()
+        regimes = [UniqueDecodingRegime(field), JohnsonBoundRegime(field)]
+
+        result = {}
+        for regime in regimes:
+            id = regime.identifier()
+            pcs_levels = self.pcs.get_pcs_security_levels(regime)
+
+            # Add DEEP-ALI errors if circuit params are provided
+            if self._has_deep_ali_params():
+                rate = self.pcs.get_rate()
+                dimension = self.pcs.get_dimension()
+                list_size = regime.get_max_list_size(rate, dimension)
+                deep_ali_levels = self._get_DEEP_ALI_errors(list_size)
+                all_levels = pcs_levels | deep_ali_levels
+            else:
+                all_levels = pcs_levels
+
+            all_levels["total"] = min(all_levels.values())
+            result[id] = all_levels
+
+        result["best attack"] = self.pcs.get_best_attack_security()
+
+        return result
+
+    def _has_deep_ali_params(self) -> bool:
+        return self.num_columns is not None
+
+    def _get_DEEP_ALI_errors(self, L_plus: float) -> dict[str, int]:
+        """
+        Compute common proof system error components that are shared across regimes.
+        Some of them depend on the list size L_plus
+
+        Returns a dictionary containing levels for ALI and DEEP
+        """
+        # TODO Check that it holds for all regimes
+
+        # XXX These proof system errors are actually quite RISC0 specific.
+        # See Section 3.4 from the RISC0 technical report.
+        # We might want to generalize this further for other zkEVMs.
+        # For example, Miden also computes similar values for DEEP-ALI in:
+        # https://github.com/facebook/winterfell/blob/2f78ee9bf667a561bdfcdfa68668d0f9b18b8315/air/src/proof/security.rs#L188-L210
+        field_size = self.pcs.get_field().F
+        trace_length = self.pcs.get_dimension()
+        D = trace_length / self.pcs.get_rate()
+
+        e_ALI = L_plus * self.num_columns / field_size
+        e_DEEP = (
+            L_plus
+            * (self.AIR_max_degree * (trace_length + self.max_combo - 1) + (trace_length - 1))
+            / (field_size - trace_length - D)
+        )
+
+        levels = {}
+        levels["ALI"] = get_bits_of_security_from_error(e_ALI)
+        levels["DEEP"] = get_bits_of_security_from_error(e_DEEP)
+
+        return levels
 
 
-class zkVM(ABC):
+class zkVM:
     """
     A class modeling a zkVM, which contains one or more circuits.
     """
 
-    @abstractmethod
+    def __init__(self, name: str, circuits: list[Circuit]):
+        self._name = name
+        self._circuits = circuits
+
     def get_name(self) -> str:
         """Returns the name of the zkVM."""
-        ...
+        return self._name
 
-    @abstractmethod
     def get_circuits(self) -> list[Circuit]:
         """Returns the list of circuits in this zkVM."""
-        ...
+        return self._circuits
+
+    @classmethod
+    def load_fri_from_toml(cls, toml_path: Path) -> "zkVM":
+        """
+        Load a FRI-based VM from a TOML configuration file.
+        """
+        with open(toml_path, "r") as f:
+            config = toml.load(f)
+
+        field = parse_field(config["zkevm"]["field"])
+        circuits = []
+
+        for section in config.get("circuits", []):
+            pcs = FRI(FRIConfig(
+                hash_size_bits=config["zkevm"]["hash_size_bits"],
+                rho=section["rho"],
+                trace_length=section["trace_length"],
+                field=field,
+                batch_size=section["batch_size"],
+                power_batching=section["power_batching"],
+                num_queries=section["num_queries"],
+                FRI_folding_factors=section.get("fri_folding_factors"),
+                FRI_early_stop_degree=section.get("fri_early_stop_degree"),
+                grinding_query_phase=section.get("grinding_query_phase", 0),
+            ))
+            circuit = Circuit(CircuitConfig(
+                name=section["name"],
+                pcs=pcs,
+                num_columns=section["num_columns"],
+                AIR_max_degree=section["air_max_degree"],
+                max_combo=section["opening_points"],
+            ))
+            circuits.append(circuit)
+
+        return cls(config["zkevm"]["name"], circuits=circuits)
+
+    @classmethod
+    def load_whir_from_toml(cls, toml_path: Path) -> "zkVM":
+        """
+        Load a WHIR-based VM from a TOML configuration file.
+        """
+        with open(toml_path, "r") as f:
+            config = toml.load(f)
+
+        field = parse_field(config["zkevm"]["field"])
+        circuits = []
+
+        for section in config.get("circuits", []):
+            pcs = WHIR(WHIRConfig(
+                hash_size_bits=config["zkevm"]["hash_size_bits"],
+                log_inv_rate=section["log_inv_rate"],
+                num_iterations=section["num_iterations"],
+                folding_factor=section["folding_factor"],
+                field=field,
+                log_degree=section["log_degree"],
+                batch_size=section["batch_size"],
+                power_batching=section["power_batching"],
+                grinding_bits_batching=section["grinding_bits_batching"],
+                constraint_degree=section["constraint_degree"],
+                grinding_bits_folding=section["grinding_bits_folding"],
+                num_queries=section["num_queries"],
+                grinding_bits_queries=section["grinding_bits_queries"],
+                num_ood_samples=section["num_ood_samples"],
+                grinding_bits_ood=section["grinding_bits_ood"],
+            ))
+            circuit = Circuit(CircuitConfig(
+                name=section["name"],
+                pcs=pcs,
+            ))
+            circuits.append(circuit)
+
+        return cls(config["zkevm"]["name"], circuits=circuits)
