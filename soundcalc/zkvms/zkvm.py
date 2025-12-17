@@ -56,6 +56,7 @@ class zkVM:
             pcs = FRI(FRIConfig(
                 hash_size_bits=config["zkevm"]["hash_size_bits"],
                 rho=section["rho"],
+                proximity_gap=section.get("proximity_gap"),
                 trace_length=section["trace_length"],
                 field=field,
                 batch_size=section["batch_size"],
@@ -69,6 +70,7 @@ class zkVM:
                 name=section["name"],
                 pcs=pcs,
                 field=field,
+                proximity_gap=section.get("proximity_gap"),
                 num_columns=section["num_columns"],
                 AIR_max_degree=section["air_max_degree"],
                 max_combo=section["opening_points"],
