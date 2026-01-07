@@ -1,9 +1,7 @@
 ![](assets/logo.png)
 # soundcalc
 
-🚧 **WIP right now. Please give us some time.** 🚧
-
-> 🔎 **Latest reports live in [`reports/`](reports/)**
+> 🔎 **Reports: [summary](reports/summary.md)** · [individual zkVMs](reports/)
 
 A universal soundness calculator across hash-based zkEVM proof systems and security regimes.
 
