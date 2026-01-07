@@ -240,7 +240,7 @@ This section summarizes the proof-size formula computed in \verb|get_proof_size_
 \subsection{Initial Sumcheck Size}
 
 
-Thus the folding proof size per round is
+The folding proof size per round is
 \[
   S_{\mathrm{sumcheck}} = k(d-1)\bfield.
 \]
@@ -249,7 +249,7 @@ Thus the folding proof size per round is
 
 \[
   S_{\mathrm{ood},i}
-    = \bhash+w_iq+k(d-1)\bfield
+    = \bhash+w_i\bfield+k(d-1)\bfield
 \]
 
 $$
@@ -259,13 +259,13 @@ $$
 \subsection{Query Proof Size for Iteration \(i\)}
 
 
-Thus
+We compute
 \[
   S_{\mathrm{qry},i}
-    =\begin{cases} t_i \cdot MP(2^{m_i+\mu_i-k},2^k,\log_2 q,\bhash).\quad i>0\\
-    t_i \cdot MP(2^{m_0+\mu_0-k},2^k,\log_2 p,\bhash).\quad M=1
+    =\begin{cases}  eMP(2^{m_i+\mu_i-k},t_i,2^k,\bfield,\bhash).\quad i>0\\
+     eMP(2^{m_0+\mu_0-k},t_0, B\cdot 2^k,\bprime,\bhash).\quad i=0
     \end{cases}
-\]where $p$ is characteristic of the field $\FFF_q$.
+\]
 
 
 \subsection{Total Proof Size}

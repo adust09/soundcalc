@@ -115,12 +115,13 @@ Initial round: one root and one path per query.
 
 The proof size is calculated as follows:
 \begin{multline}
-    \bproof =   \underbrace{ \bhash+ t\cdot eMP(n,   q,\sbtch,\bfield,\bhash)}_{\text{Initial round}} + \underbrace{\sum_{0\leq i < r_{FRI} } \left(\bhash+
-     t\cdot eMP(\frac{n}{\prod_{0\leq j \leq  i} \folds[j]},  q,\sbtch,\bfield,\bhash)\right)}_{\text{Folding rounds }}
+    \bproof =   \underbrace{ \bhash+  eMP(n,  t ,\sbtch,\bfield,\bhash)}_{\text{Initial round}} + \underbrace{\sum_{0\leq i < r_{FRI} } \left(\bhash+
+      eMP(\frac{n}{\prod_{0\leq j \leq  i} \folds[j]},  t ,\sbtch,\bfield,\bhash)\right)}_{\text{Folding rounds }}
     \end{multline}
-where $eMP(n, s, q, b)$ is the expected Merkle path size
+where $eMP(n, t, b, \bfield, \bhash)$ is the expected Merkle path size for $t$ queries to the $n$ leaf tree,
+where each leaf has $b$ elements of $\bfield$ bits each,
 calculated as \verb|get_size_of_merkle_multi_proof_bits_expected()|
 \begin{equation}
-    eMP(n,q,b,\bfield,\bhash) =   \underbrace{n\cdot b\cdot \bfield}_{\text{leaf size}}
-    +\bhash\sum_{1\leq d\leq \lceil \log_{2} n\rceil}\lceil 2^d\left((1-2^{-d})^q-(1-2^{1-d})^q\right)\rceil
+    eMP(n,t, b,\bfield,\bhash) =   \underbrace{t\cdot b\cdot \bfield}_{\text{ size of all}}
+    +\bhash\sum_{1\leq d\leq \lceil \log_{2} n\rceil}\lceil 2^d\left((1-2^{-d})^t-(1-2^{1-d})^t\right)\rceil
 \end{equation}
